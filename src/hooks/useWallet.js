@@ -1,9 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 
+const ANVIL_CHAIN_ID = 31337
+const ANVIL_CHAIN = {
+  chainId: '0x7A69', // 31337 in hex
+  chainName: 'Anvil Local',
+  rpcUrls: ['http://localhost:8545'],
+  nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+}
+
 export default function useWallet() {
   const [account, setAccount] = useState(null)
   const [chainId, setChainId] = useState(null)
   const [error, setError] = useState('')
+  const [switching, setSwitching] = useState(false)
 
   const updateChain = useCallback(async (ethereum) => {
     try {
@@ -12,6 +21,39 @@ export default function useWallet() {
     } catch {
       // ignore
     }
+  }, [])
+
+  const switchToAnvil = useCallback(async () => {
+    if (!window.ethereum) return
+    setSwitching(true)
+    setError('')
+    try {
+      // Try switching first (fast path if chain already added)
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: ANVIL_CHAIN.chainId }],
+      })
+    } catch (switchErr) {
+      // 4902 = chain not added yet, add it
+      if (switchErr.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [ANVIL_CHAIN],
+          })
+        } catch (addErr) {
+          setError('添加网络失败: ' + addErr.message)
+          setSwitching(false)
+          return
+        }
+      } else {
+        setError('切换网络失败: ' + switchErr.message)
+        setSwitching(false)
+        return
+      }
+    }
+    setChainId(ANVIL_CHAIN_ID)
+    setSwitching(false)
   }, [])
 
   const connect = useCallback(async () => {
@@ -42,7 +84,6 @@ export default function useWallet() {
     const { ethereum } = window
     if (!ethereum) return
 
-    // Listen for account changes
     const handleAccountsChanged = (accounts) => {
       if (accounts.length === 0) {
         disconnect()
@@ -50,7 +91,6 @@ export default function useWallet() {
         setAccount(accounts[0])
       }
     }
-    // Listen for chain changes
     const handleChainChanged = (id) => {
       setChainId(Number(id))
     }
@@ -64,5 +104,5 @@ export default function useWallet() {
     }
   }, [disconnect])
 
-  return { account, chainId, error, connect, disconnect }
+  return { account, chainId, error, switching, connect, disconnect, switchToAnvil }
 }

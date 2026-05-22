@@ -3,9 +3,13 @@ import useTokenBank from './hooks/useTokenBank'
 import WalletConnect from './components/WalletConnect'
 import TokenBank from './components/TokenBank'
 
+const ANVIL_CHAIN_ID = 31337
+
 export default function App() {
-  const { account, chainId, error: walletError, connect, disconnect } = useWallet()
-  const bank = useTokenBank(account, chainId)
+  const { account, chainId, error: walletError, switching, connect, disconnect, switchToAnvil } = useWallet()
+  const bank = useTokenBank(account)
+
+  const needSwitch = account && chainId !== null && chainId !== ANVIL_CHAIN_ID
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -37,6 +41,19 @@ export default function App() {
               连接钱包开始
             </button>
           </div>
+        ) : needSwitch ? (
+          <div className="text-center py-20">
+            <div className="text-6xl mb-4">🔗</div>
+            <h2 className="text-2xl font-bold mb-2">网络不匹配</h2>
+            <p className="text-gray-400 mb-6">请切换到 Anvil 本地区块链网络 (Chain ID: 31337)</p>
+            <button
+              onClick={switchToAnvil}
+              disabled={switching}
+              className="px-8 py-3 rounded-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium text-lg transition-colors"
+            >
+              {switching ? '切换中...' : '切换网络'}
+            </button>
+          </div>
         ) : (
           <TokenBank bank={bank} />
         )}
@@ -44,7 +61,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="border-t border-gray-800 py-4 text-center text-gray-600 text-xs">
-        TokenBank DApp · 请使用 Sepolia 测试网
+        TokenBank DApp · Anvil 本地链
       </footer>
     </div>
   )

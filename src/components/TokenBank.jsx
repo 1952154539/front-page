@@ -1,14 +1,16 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { parseUnits } from 'viem'
 
 export default function TokenBank({ bank }) {
   const [amount, setAmount] = useState('')
-  const [tab, setTab] = useState('deposit') // 'deposit' | 'withdraw'
+  const [tab, setTab] = useState('deposit')
 
   const {
     tokenBalance,
     depositedBalance,
     totalDeposits,
     tokenSymbol,
+    tokenDecimals,
     allowance,
     loading,
     txHash,
@@ -16,29 +18,43 @@ export default function TokenBank({ bank }) {
     approve,
     deposit,
     withdraw,
+    withdrawAll,
     fetchBalances,
     formatBalance,
   } = bank
 
+  const amountWei = useMemo(() => {
+    if (!amount || parseFloat(amount) <= 0) return 0n
+    try {
+      return parseUnits(amount, tokenDecimals)
+    } catch {
+      return 0n
+    }
+  }, [amount, tokenDecimals])
+
+  const needApproval = tab === 'deposit' && amountWei > 0n && allowance < amountWei
+
   const handleApprove = async () => {
-    if (!amount || parseFloat(amount) <= 0) return
+    if (amountWei <= 0n) return
     await approve(amount)
   }
 
   const handleDeposit = async () => {
-    if (!amount || parseFloat(amount) <= 0) return
+    if (amountWei <= 0n) return
     await deposit(amount)
     setAmount('')
   }
 
   const handleWithdraw = async () => {
-    if (!amount || parseFloat(amount) <= 0) return
+    if (amountWei <= 0n) return
     await withdraw(amount)
     setAmount('')
   }
 
-  const amountWei = amount ? (() => { try { return BigInt(Math.floor(parseFloat(amount) * 10 ** 18)) } catch { return 0n } })() : 0n
-  const needApproval = tab === 'deposit' && amountWei > 0n && allowance < amountWei
+  const handleWithdrawAll = async () => {
+    if (depositedBalance <= 0n) return
+    await withdrawAll()
+  }
 
   return (
     <div className="w-full max-w-lg mx-auto space-y-6">
@@ -117,7 +133,7 @@ export default function TokenBank({ bank }) {
             {needApproval && (
               <button
                 onClick={handleApprove}
-                disabled={loading || !amount}
+                disabled={loading || amountWei <= 0n}
                 className="flex-1 py-3 rounded-lg bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium transition-colors"
               >
                 {loading ? '处理中...' : '1. 授权'}
@@ -125,7 +141,7 @@ export default function TokenBank({ bank }) {
             )}
             <button
               onClick={handleDeposit}
-              disabled={loading || !amount || needApproval}
+              disabled={loading || amountWei <= 0n || needApproval}
               className="flex-1 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium transition-colors"
             >
               {loading ? '处理中...' : needApproval ? '2. 存款' : '存款'}
@@ -134,13 +150,22 @@ export default function TokenBank({ bank }) {
         )}
 
         {tab === 'withdraw' && (
-          <button
-            onClick={handleWithdraw}
-            disabled={loading || !amount}
-            className="w-full py-3 rounded-lg bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium transition-colors"
-          >
-            {loading ? '处理中...' : '取款'}
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={handleWithdraw}
+              disabled={loading || amountWei <= 0n || amountWei > depositedBalance}
+              className="w-full py-3 rounded-lg bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium transition-colors"
+            >
+              {loading ? '处理中...' : '取款'}
+            </button>
+            <button
+              onClick={handleWithdrawAll}
+              disabled={loading || depositedBalance <= 0n}
+              className="w-full py-2 rounded-lg text-gray-400 hover:text-white text-sm transition-colors"
+            >
+              全部取出 ({formatBalance(depositedBalance)} {tokenSymbol})
+            </button>
+          </div>
         )}
       </div>
 

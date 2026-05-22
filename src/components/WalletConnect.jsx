@@ -3,6 +3,7 @@ export default function WalletConnect({ account, chainId, error, onConnect, onDi
 
   const chainNames = {
     1: 'Ethereum',
+    31337: 'Anvil Local',
     11155111: 'Sepolia',
     80002: 'Polygon Amoy',
     137: 'Polygon',
